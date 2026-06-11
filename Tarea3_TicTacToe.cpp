@@ -10,8 +10,15 @@
 #include <cstdlib>   //usar rand, srand
 #include <ctime>
 #include <algorithm>
+#include <chrono>
 
 using namespace std;
+
+//////////////// Metricas ///////////////////
+long long nodesVisited = 0;     //Total de nodos visitados
+long long nodesPruned = 0;      //Número de podas realizadas (solo AlphaBeta)
+double decisionTime = 0.0;      //Tiempo que tarda un agente en decidir su movimiento (segundos)
+int depthReached = 0;   //Profundidad máxima utilizada en la búsqueda
 
 // thrown when set() encounters an illegal input
 struct InputException { };
@@ -340,6 +347,7 @@ State apply_move(State state, Move move)
 ////////////////////////////////// MiniMax ////////////////////////////////////
 int MiniMax(State state, int depth)
 {
+    nodesVisited++; //Contar el estado del arbol
     int winner = check_winner(state);
 
     //Comprobar ganador
@@ -387,6 +395,7 @@ int MiniMax(State state, int depth)
 ////////////////////////////////// NegaMax ////////////////////////////////////
 int NegaMax(State state, int depth, int color)
 {
+    nodesVisited++; //Contar el estado del arbol
     int winner = check_winner(state);
 
     //Estados terminales
@@ -416,6 +425,7 @@ int NegaMax(State state, int depth, int color)
 ////////////////////////////////// AlphaBeta ////////////////////////////////////
 int AlphaBeta(State state, int depth, int alpha, int beta)
 {
+    nodesVisited++; //Contar el estado del arbol
     int winner = check_winner(state);
 
     //Comprobar ganador
@@ -442,7 +452,11 @@ int AlphaBeta(State state, int depth, int alpha, int beta)
 
             beta = min(beta, best);
 
-            if(beta <= alpha) { break; }
+            if(beta <= alpha) 
+            { 
+                nodesPruned++;  //nodos podados    
+                break; 
+            }
         }
 
         return best;
@@ -460,7 +474,11 @@ int AlphaBeta(State state, int depth, int alpha, int beta)
 
             alpha = max(alpha, best);
 
-            if(beta <= alpha) { break; }
+            if(beta <= alpha) 
+            { 
+                nodesPruned++;
+                break; 
+            }
         }
 
         return best;
@@ -646,6 +664,19 @@ Move human_Player(const State& state)
     }
 }
 
+//Nombre de los agentes
+string agent_name(int agent)
+{
+    switch(agent)
+    {
+        case 0: return "Humano";
+        case 1: return "Aleatorio";
+        case 2: return "MiniMax";
+        case 3: return "NegaMax";
+        case 4: return "AlphaBeta";
+        default: return "Desconocido";
+    }
+}
 
 
 int main(int argc, char* argv[])
@@ -707,8 +738,8 @@ int main(int argc, char* argv[])
     cout << "K: " << K << endl;
     cout << "Profundidad H: " << H << endl;
 
-    cout << "Jugador X: " << p1_type << endl;
-    cout << "Jugador O: " << p2_type << endl;
+    cout << "Jugador X: " << agent_name(p1_type) << endl;
+    cout << "Jugador O: " << agent_name(p2_type) << endl;
 
     cout << "==================================" << endl;
 
@@ -766,6 +797,14 @@ int main(int argc, char* argv[])
             currentAgent = p2_type;
         }
 
+        // Reiniciar métricas para la jugada
+        nodesVisited = 0;
+        nodesPruned = 0;
+        decisionTime = 0.0;
+        depthReached = H;
+
+        auto start = chrono::high_resolution_clock::now();
+
         //Ejecutar agente seleccionado
         switch(currentAgent)
         {
@@ -787,6 +826,28 @@ int main(int argc, char* argv[])
             default: cout << "Error: Se ha seleccionado un agente invalido." << endl;
                      break;
         }
+
+        auto end = chrono::high_resolution_clock::now();
+
+        decisionTime = chrono::duration<double>(end - start).count();
+
+        //Mostrar metricas
+        cout << "\n--- Metricas de la jugada ---" << endl;
+        cout << "Nodos visitados: " << nodesVisited << endl;
+
+        //Nodos podados solo para AlphaBeta
+        if(currentAgent == 4)
+        {
+            cout << "Nodos podados: " << nodesPruned << endl;
+        }
+
+        //Los agentes humano y aleatorio no tienen profundidad
+        if(currentAgent >= 2)
+        {
+            cout << "Profundidad utilizada: " << depthReached << endl;
+        }
+
+        cout << "Tiempo de decision: " << decisionTime << " segundos" << endl;
 
         //Aplicar movimiento
         state.make_move(move.x, move.y);    //Realizar movimiento
