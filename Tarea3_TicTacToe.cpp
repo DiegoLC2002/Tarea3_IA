@@ -1,0 +1,615 @@
+//Compilar con: g++ Lab_TicTacToe.cpp -o TicTacToe
+
+// tic-tac-toe 
+#include <cassert>
+#include <cstring>
+#include <iostream>
+#include <sstream>
+#include <vector>
+#include <array>
+#include <cstdlib>   //usar rand, srand
+#include <ctime>
+
+using namespace std;
+
+// thrown when set() encounters an illegal input
+struct InputException { };
+
+//Estructura para representar movimientos
+struct Move
+{
+    int x;
+    int y;
+};
+
+//Representa el Estado del Juego
+class State
+{
+    public:
+
+        enum Players { P1 = -1, P2 = 1 }; //Jugadores (P1 = X ; P2 = O)
+        static const int  N = 3;          //Tamaño del tablero
+        static const int  SIZE = N*N;     //Total de casillas en el tablero
+        static const array<char, 3> DISP; //Simbolos del tablero ([0] = x; [1] = - ; [2] = O)
+
+        // initialize empty board
+        // P1 to move
+        State()
+        {
+            sq = { {} };
+            to_move = P1;   //Comienza el P1
+            filled = 0;
+        }
+
+        // return true if board is full
+        bool full() const
+        {
+            return filled >= SIZE;
+        }
+  
+        // initialize state from string (P1 to move)
+        // throw InputExceptiuon when you encounter an error in s
+        void set(const string & s)
+        {
+            // create input stream from string, now you can use >>, etc.
+            // like for cin
+            istringstream is(s);
+            char c;
+
+            to_move = P1;
+            filled = 0;
+
+            //Recorrer Tablero
+            for (int y = 0; y < N; ++y) 
+            {
+                for (int x = 0; x < N; ++x) 
+                {
+                    is >> c;
+
+                    if (!is) { throw InputException(); }    //Error si faltan caracteres
+
+                    if (c == DISP[1 + P1]) { sq[y][x] = P1; ++filled; }   //si es 'o'
+                    else if (c == DISP[1 + P2]) { sq[y][x] = P2; ++filled; }  //si es `x`
+                    else { sq[y][x] = 0; }  //si est vacio
+                }
+            }
+
+            //Verificar caracteres extras
+            is >> c;
+            if (is) { throw InputException(); }
+        }
+  
+        //Imprimir Tablero
+        // print state to cout
+        // format:
+        //
+        //  xox
+        //  o-x
+        //  xxo
+        //  x (8)
+        //
+        // last line: player to move, number of filled squares
+        // followed by new-line
+        void print() const
+        {
+            cout << endl;
+
+            cout << " 0 1 2" << endl;
+
+            for (int y = 0; y < N; ++y) 
+            {
+                cout << y << " ";
+
+                for (int x = 0; x < N; ++x) 
+                {
+                    cout << DISP[sq[y][x] + 1] << " ";
+                }
+
+                cout << endl;
+            }
+            cout << endl;
+
+            // print player to move and #filled squares
+            //cout << DISP[to_move + 1] << " (" << filled << ")" << endl;
+
+            //Mostrar jugador actual
+            cout << "Turno: " << DISP[to_move + 1] << endl;
+
+            //Mostrar casillas ocupadas
+            cout << "Casillas ocupadas: " << filled << endl;
+        }
+  
+
+        // make move (x, y) for player to_move
+        // and return true iff move is legal
+        // pre-condition: x, y within range
+        bool make_move(int x, int y)
+        {
+            //Verificar rango
+            assert(x >= 0 && x < N && y >= 0 && y < N);
+
+            auto &c = sq[y][x];     //Referencia a casilla
+
+            if (c) 
+            {
+                return false; // casilla ya ocupada
+            }
+            
+            c = to_move;            //Colocar pieza
+            to_move = - to_move;    //Cambiar de jugador
+            ++filled;
+
+            return true;
+        }
+
+        // return player to move (retorna jugador actual)
+        int get_to_move() const
+        {
+            return to_move;
+        }
+
+        //Getter del tablero
+        const array<array<signed char, N>, N>& get_board() const
+        {
+            return sq;
+        }
+  
+    private:
+        int to_move;    //Jugador actual
+
+        // squares (2d array)
+        // stores P1,0,P2 values
+        // bounds are checked in debug mode
+        // and sq[y][x] = 0 works
+        array<array<signed char, N>, N> sq;
+
+        int filled;        //Numero de casillas ocupadas    
+};
+
+// how pieces are displayed ...
+// P1, empty, P2
+const array<char, 3> State::DISP = {{ 'x', '-', 'o' }};
+
+//Revisar ganador de la partida
+int check_winner(const State& state)
+{
+    auto board = state.get_board();
+
+    //Revisar filas
+    for(int y = 0; y < State::N; y++)
+    {
+        int sum = 0;
+
+        for(int x = 0; x < State::N; x++)
+        {
+            sum += board[y][x];
+        }
+
+        if(sum == -3) { return State::P1; }     //Gana el jugador 1
+
+        if(sum == 3) {return State::P2; }       //Gana el jugador 2
+    }
+
+    //Rvisar columnas
+    for(int x = 0; x < State::N; x++)
+    {
+        int sum = 0;
+
+        for(int y = 0; y < State::N; y++)
+        {
+            sum += board[y][x];
+        }
+
+        if(sum == -3) { return State::P1; }
+
+        if(sum == 3) {return State::P2; }
+    }
+
+    //Revisar diagonal principal (\)
+    int diagP = 0;
+
+    for(int i = 0; i < State::N; i++)
+    {
+        diagP += board[i][i];
+    }
+
+    if(diagP == -3) { return State::P1; }
+
+    if(diagP == 3) {return State::P2; }
+
+    //Revisar diagonal secundaria (/)
+    int diagS = 0;
+
+    for(int i = 0; i < State::N; i++)
+    {
+        diagS += board[i][State::N - 1 - i];
+    }
+
+    if(diagS == -3) { return State::P1; }
+
+    if(diagS == 3) {return State::P2; }
+
+    return 0; //Nadie gana la partida
+}
+      
+//Obtener movimientos validos
+vector<Move> get_valid_moves(const State& state)
+{
+    vector<Move> valid_moves;
+    auto board = state.get_board();
+
+    //Buscar espacios vacios
+    for(int y = 0; y < State::N; y++)
+    {
+        for(int x = 0; x < State::N; x++)
+        {
+            if(board[y][x] == 0)
+            {
+                valid_moves.push_back({x, y});
+            }
+        }
+    }
+
+    return valid_moves;
+}
+
+//Crear nuevo estado aplicando movimiento
+State apply_move(State state, Move move)
+{
+    state.make_move(move.x, move.y);
+    return state;
+}
+
+////////////////////////////////// MiniMax ////////////////////////////////////
+int MiniMax(State state)
+{
+    int winner = check_winner(state);
+
+    if(winner == State::P1){ return -1; }    //Gana X
+    if(winner == State::P2){ return 1; }    //Gana O
+    if(state.full()){ return 0; }    //Empate
+
+    vector<Move> valid_moves = get_valid_moves(state);
+
+    //Turno de X (Minimizador)
+    if(state.get_to_move() == State::P1)
+    {
+        int best = 1000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = MiniMax(next);
+
+            if(score < best) { best = score; }
+        }
+
+        return best;
+    }
+    else    //Turno de O (maximizador)
+    {
+        int best = -1000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = MiniMax(next);
+
+            if(score > best) { best = score; }
+        }
+
+        return best;
+    }
+
+}
+
+////////////////////////////////// NegaMax ////////////////////////////////////
+int NegaMax(State state, int color)
+{
+    int winner = check_winner(state);
+
+    //Estados terminales
+    if(winner == State::P1){ return color * (-1); }    //Si le toca jugar a O, entocnes gana X acaba de ganar
+    if(winner == State::P2){ return color * (1); }    //Si le toca jugar a X, entocnes gana O acaba de ganar
+    if(state.full()){ return 0; }    //Empate
+
+    int best = -1000;
+
+    vector<Move> valid_moves = get_valid_moves(state);
+
+    for(auto move : valid_moves)
+    {
+        State next = apply_move(state, move);
+        int score = -NegaMax(next, -color);
+
+        if(score > best) { best = score; }
+    }
+
+    return best;
+}
+
+
+//////////////////////////////// Tipos de Jugadores ////////////////////////
+//Jugador Aleatorio
+Move random_Player(const State& state)
+{
+    auto board = state.get_board();
+
+    vector<Move> valid_moves;   //movimientos validos a realizar
+
+    //Buscar espacios vacios
+    for(int y = 0; y < State::N; y++)
+    {
+        for(int x = 0; x < State::N; x++)
+        {
+            if(board[y][x] == 0)
+            {
+                valid_moves.push_back({x, y});
+            }
+        }
+    }
+
+    //Escoger un movimieto de los validos
+    int randomMov = rand() % valid_moves.size();
+
+    return valid_moves[randomMov];
+}
+
+
+//Jugador MiniMax
+Move minimax_Player(const State& state)
+{
+    vector<Move> valid_moves = get_valid_moves(state);
+    Move bestMove = valid_moves[0];
+
+    //X minimiza
+    if(state.get_to_move() == State::P1)
+    {
+        int bestScore = 1000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = MiniMax(next);
+
+            if(score < bestScore) 
+            { 
+                bestScore = score; 
+                bestMove = move;
+            }
+        }
+
+    }
+    else    //O maximiza
+    {
+        int bestScore = -1000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = MiniMax(next);
+
+            if(score > bestScore) 
+            { 
+                bestScore = score; 
+                bestMove = move;
+            }        
+        }
+
+    }
+
+    return bestMove;
+}
+
+
+//Jugador Negamax
+Move negamax_Player(const State& state)
+{
+    vector<Move> valid_moves = get_valid_moves(state);
+    Move bestMove = valid_moves[0];
+
+    int bestScore = -1000;
+    int color;
+
+    if(state.get_to_move() == State::P1) { color = -1; }
+    else { color = 1; }
+
+    for(auto move : valid_moves)
+    {
+        State next = apply_move(state, move);
+        int score = -NegaMax(next, -color);
+
+            if(score > bestScore) 
+            { 
+                bestScore = score; 
+                bestMove = move;
+            }
+    }
+
+    return bestMove;
+}
+
+
+//Jugador Humano
+Move human_Player(const State& state)
+{
+    auto board = state.get_board();
+    int x, y;
+
+    while(true)
+    {
+        cout << "Ingrese coordenadas (X Y): ";
+        cin >> x >> y;
+
+        //Verificar rango
+        bool valid_range = 
+            x >= 0 && x < State::N &&
+            y >= 0 && y < State::N;
+
+        if(valid_range)
+        {
+            //Verificar casilla vacia
+            bool empty_cell = board[y][x] == 0;
+
+            if(empty_cell)
+            {
+                return {x, y};
+            }
+        }
+
+        cout << "Movimiento invalido, ingrese otro." << endl;
+    }
+}
+
+
+
+int main()
+{
+    /*
+    std::vector<string> boards
+    {
+        "--- \
+        --- \
+        ---", // x draws with (0,0)
+
+        "--- \
+        -o- \
+        ---", // x draws with (0,0)
+
+        "--- \
+        --o \
+        ---", // x draws with (0,1)
+
+        "-oo \
+        ooo \
+        ooo", // a player already won
+    
+        "xox \
+        oxo \
+        oxo", // draw
+
+        "--o \
+        -oo \
+        ---", // x loses
+
+        "oxo \
+        xx- \
+        oox", // x wins with (2,1)
+
+        "-xo \
+        oox \
+        xoo", // x draws with (0,0)
+
+        "--- \
+        -x- \
+        ---"  // x wins with (0,0)
+    };
+
+    for (const string & s : boards) 
+    {
+        // construct state from string
+        // also catch exception and print
+        // error message
+        try 
+        {
+            State st;
+            st.set(s);
+            cout<<"Before move"<<endl;
+            st.print();
+            cout<<"After move. Status: "<<st.make_move(0,0)<<endl;
+            st.print();
+            cout<<"==============================="<<endl;
+            cout << endl;
+        }
+        catch (InputException & e) 
+        {
+            cerr << "corrupt input: " << s << endl;
+        }
+    }
+    */
+
+    srand(time(0));     //Iniciar random
+
+    //Sleccionar tipo de jugador
+    char p1_type;
+    char p2_type;
+
+    cout << "Seleccione tipo de jugador" << endl;
+    cout << "h = humano" << endl;
+    cout << "r = random" << endl;
+    cout << "m = minimax" << endl;
+    cout << "n = negamax" << endl;
+
+    cout << endl;
+
+    cout << "Jugador 1 (X): ";
+    cin >> p1_type;
+
+    cout << "Jugador 2 (O): ";
+    cin >> p2_type;
+
+    State state;     //Crear estado inicial del juego
+
+    int turn = 1;   //Turnos del juego
+
+    
+    while (true)
+    {
+        //Separador visual
+        cout << "\n========== TURNO " << turn << " ==========\n";
+
+        state.print();
+
+        //comprobar ganador
+        int winner = check_winner(state);
+
+        //Gana jugador 1
+        if(winner == State::P1)
+        {
+            cout << endl;
+            cout << "¡¡¡ Gana X !!!!" << endl;
+            break;
+        }
+
+        //Gana jugador 2
+        if(winner == State::P2)
+        {
+            cout << endl;
+            cout << "¡¡¡ Gana O !!!!" << endl;
+            break;
+        }
+
+        //Empate
+        if(state.full())
+        {
+            cout << endl;
+            cout << "Se ha Empatado" << endl;
+            break;
+        }
+
+        //Obtener movimiento realizado
+        Move move;
+
+        //Turno jugador X
+        if(state.get_to_move() == State::P1)
+        {
+            if (p1_type == 'h') { move = human_Player(state); }         //Humano
+            else if (p1_type == 'r') { move = random_Player(state); }   //Random
+            else if (p1_type == 'm') { move = minimax_Player(state); }   //Minimax
+            else if (p1_type == 'n') { move = negamax_Player(state); }   //Negamax
+        }
+        else    //Turno jugador O
+        {
+            if (p2_type == 'h') { move = human_Player(state); }         //Humano
+            else if (p2_type == 'r') { move = random_Player(state); }   //Random
+            else if (p2_type == 'm') { move = minimax_Player(state); }   //Minimax
+            else if (p2_type == 'n') { move = negamax_Player(state); }   //Negamax
+        }
+
+        state.make_move(move.x, move.y);    //Realizar movimiento
+        turn++;
+    }
+    
+    return 0;
+
+}
