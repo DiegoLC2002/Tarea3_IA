@@ -413,6 +413,61 @@ int NegaMax(State state, int depth, int color)
 }
 
 
+////////////////////////////////// AlphaBeta ////////////////////////////////////
+int AlphaBeta(State state, int depth, int alpha, int beta)
+{
+    int winner = check_winner(state);
+
+    //Comprobar ganador
+    if(winner == State::P1){ return -10000; }    //Gana X
+    if(winner == State::P2){ return 10000; }    //Gana O
+    if(state.full()){ return 0; }    //Empate
+
+    //comprobar profundidad
+    if(depth == 0){ return heuristic(state); }
+
+    vector<Move> valid_moves = get_valid_moves(state);
+
+    //Turno de X (Minimizador)
+    if(state.get_to_move() == State::P1)
+    {
+        int best = 100000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = AlphaBeta(next, depth - 1, alpha, beta);
+
+            best = min(best, score);
+
+            beta = min(beta, best);
+
+            if(beta <= alpha) { break; }
+        }
+
+        return best;
+    }
+    else    //Turno de O (maximizador)
+    {
+        int best = -100000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = AlphaBeta(next, depth - 1, alpha, beta);
+
+            best = max(best, score);
+
+            alpha = max(alpha, best);
+
+            if(beta <= alpha) { break; }
+        }
+
+        return best;
+    }
+}
+
+
 //////////////////////////////// Tipos de Jugadores ////////////////////////
 //Jugador Aleatorio
 Move random_Player(const State& state)
@@ -514,6 +569,52 @@ Move negamax_Player(const State& state, int depth)
 }
 
 
+//Jugador AlphaBeta
+Move alphabeta_Player(const State& state, int depth)
+{
+    vector<Move> valid_moves = get_valid_moves(state);
+    Move bestMove = valid_moves[0];
+
+    //X minimiza
+    if(state.get_to_move() == State::P1)
+    {
+        int bestScore = 100000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = AlphaBeta(next, depth - 1, -100000, 100000);
+
+            if(score < bestScore) 
+            { 
+                bestScore = score; 
+                bestMove = move;
+            }
+        }
+
+    }
+    else    //O maximiza
+    {
+        int bestScore = -100000;
+
+        for(auto move : valid_moves)
+        {
+            State next = apply_move(state, move);
+            int score = AlphaBeta(next, depth - 1, -100000, 100000);
+
+            if(score > bestScore) 
+            { 
+                bestScore = score; 
+                bestMove = move;
+            }        
+        }
+
+    }
+
+    return bestMove;
+}
+
+
 //Jugador Humano
 Move human_Player(const State& state)
 {
@@ -547,30 +648,73 @@ Move human_Player(const State& state)
 
 
 
-int main()
+int main(int argc, char* argv[])
 {
     srand(time(0));     //Iniciar random
 
-    //Sleccionar tipo de jugador
-    char p1_type;
-    char p2_type;
+    //Verificar ingreso de argumentos
+    if(argc!= 7)
+    {
+        cout << "Uso: " << argv[0] << "M N K H Agente1 Agente2" << endl;
 
-    cout << "Seleccione tipo de jugador" << endl;
-    cout << "h = humano" << endl;
-    cout << "r = random" << endl;
-    cout << "m = minimax" << endl;
-    cout << "n = negamax" << endl;
+        cout << endl;
+        cout << "Agentes disponibles:" << endl;
+        cout << "0 = Humano" << endl;
+        cout << "1 = Aleatorio" << endl;
+        cout << "2 = MiniMax" << endl;
+        cout << "3 = NegaMax" << endl;
+        cout << "4 = AlphaBeta" << endl;
 
-    cout << endl;
+        return 1;
+    }
 
-    cout << "Jugador 1 (X): ";
-    cin >> p1_type;
+    //Leer parametros de argv[]
+    int M = atoi(argv[1]);     // Filas del tablero
+    int N = atoi(argv[2]);     // Columnas del tablero
+    int K = atoi(argv[3]);     // Figuras consecutivas para ganar
+    int H = atoi(argv[4]);     // Profundidad de búsqueda
 
-    cout << "Jugador 2 (O): ";
-    cin >> p2_type;
+    int p1_type = atoi(argv[5]);   // Agente jugador X
+    int p2_type = atoi(argv[6]);   // Agente jugador O
 
-    State state(5,5,4);     //Crear estado inicial del juego
+    //Validar parametros ingresados
+    if(M <= 0 || N <= 0 || K <= 0 || H <= 0)
+    {
+        cout << "Error: M, N, K y H deben ser mayores que 0." << endl;
+        return 1;
+    }
 
+    // K no puede ser mayor que ambas dimensiones
+    if(K > max(M, N))
+    {
+        cout << "Error: K es demasiado grande para el tablero." << endl;
+        return 1;
+    }
+
+    // Validar agentes
+    if(p1_type < 0 || p1_type > 4 || p2_type < 0 || p2_type > 4)
+    {
+        cout << "Error: agente invalido." << endl;
+        return 1;
+    }
+
+    //Configuracion del tablero
+    cout << "==================================" << endl;
+    cout << "      TIC-TAC-TOE M,N,K" << endl;
+    cout << "==================================" << endl;
+
+    cout << "Tablero: " << M << " x " << N << endl;
+    cout << "K: " << K << endl;
+    cout << "Profundidad H: " << H << endl;
+
+    cout << "Jugador X: " << p1_type << endl;
+    cout << "Jugador O: " << p2_type << endl;
+
+    cout << "==================================" << endl;
+
+
+    //Crear estado inicial del juego
+    State state(M,N,K);
     int turn = 1;   //Turnos del juego
 
     
@@ -610,23 +754,41 @@ int main()
 
         //Obtener movimiento realizado
         Move move;
+        int currentAgent;
 
         //Turno jugador X
         if(state.get_to_move() == State::P1)
         {
-            if (p1_type == 'h') { move = human_Player(state); }         //Humano
-            else if (p1_type == 'r') { move = random_Player(state); }   //Random
-            else if (p1_type == 'm') { move = minimax_Player(state); }   //Minimax
-            else if (p1_type == 'n') { move = negamax_Player(state); }   //Negamax
+            currentAgent = p1_type;
         }
         else    //Turno jugador O
         {
-            if (p2_type == 'h') { move = human_Player(state); }         //Humano
-            else if (p2_type == 'r') { move = random_Player(state); }   //Random
-            else if (p2_type == 'm') { move = minimax_Player(state); }   //Minimax
-            else if (p2_type == 'n') { move = negamax_Player(state); }   //Negamax
+            currentAgent = p2_type;
         }
 
+        //Ejecutar agente seleccionado
+        switch(currentAgent)
+        {
+            case 0: move = human_Player(state);     //Humano
+                    break;
+
+            case 1: move = random_Player(state);     //Aleatorio
+                    break;
+
+            case 2: move = minimax_Player(state, H);     //Minimax
+                    break;
+
+            case 3: move = negamax_Player(state, H);     //Negamax
+                    break;
+
+            case 4: move = alphabeta_Player(state, H);     //Alphabeta
+                    break;
+
+            default: cout << "Error: Se ha seleccionado un agente invalido." << endl;
+                     break;
+        }
+
+        //Aplicar movimiento
         state.make_move(move.x, move.y);    //Realizar movimiento
         turn++;
     }
