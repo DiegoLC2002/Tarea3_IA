@@ -1,4 +1,4 @@
-//Compilar con: g++ Lab_TicTacToe.cpp -o TicTacToe
+//Compilar con: g++ Tarea3_TicTacToe.cpp -o TicTacToe
 
 // tic-tac-toe 
 #include <cassert>
@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdlib>   //usar rand, srand
 #include <ctime>
+#include <algorithm>
 
 using namespace std;
 
@@ -28,15 +29,17 @@ class State
     public:
 
         enum Players { P1 = -1, P2 = 1 }; //Jugadores (P1 = X ; P2 = O)
-        static const int  N = 3;          //Tamaño del tablero
-        static const int  SIZE = N*N;     //Total de casillas en el tablero
         static const array<char, 3> DISP; //Simbolos del tablero ([0] = x; [1] = - ; [2] = O)
 
         // initialize empty board
         // P1 to move
-        State()
+        State(int rows = 3, int cols = 3, int K = 3)
         {
-            sq = { {} };
+            this->rows = rows;
+            this->cols = cols;
+            this->K = K;
+
+            sq = vector<vector<signed char>>(rows, vector<signed char>(cols, 0));
             to_move = P1;   //Comienza el P1
             filled = 0;
         }
@@ -44,7 +47,7 @@ class State
         // return true if board is full
         bool full() const
         {
-            return filled >= SIZE;
+            return filled >= rows * cols;
         }
   
         // initialize state from string (P1 to move)
@@ -60,9 +63,9 @@ class State
             filled = 0;
 
             //Recorrer Tablero
-            for (int y = 0; y < N; ++y) 
+            for (int y = 0; y < rows; ++y) 
             {
-                for (int x = 0; x < N; ++x) 
+                for (int x = 0; x < cols; ++x) 
                 {
                     is >> c;
 
@@ -94,13 +97,22 @@ class State
         {
             cout << endl;
 
-            cout << " 0 1 2" << endl;
+            //Imprimir coordenadas del tablero
+            cout << "  ";
 
-            for (int y = 0; y < N; ++y) 
+            for(int x = 0; x < cols; x++)
+            {
+                cout << x << " ";
+            }
+
+            cout << endl;
+
+
+            for (int y = 0; y < rows; ++y) 
             {
                 cout << y << " ";
 
-                for (int x = 0; x < N; ++x) 
+                for (int x = 0; x < cols; ++x) 
                 {
                     cout << DISP[sq[y][x] + 1] << " ";
                 }
@@ -126,7 +138,7 @@ class State
         bool make_move(int x, int y)
         {
             //Verificar rango
-            assert(x >= 0 && x < N && y >= 0 && y < N);
+            assert(x >= 0 && x < cols && y >= 0 && y < rows);
 
             auto &c = sq[y][x];     //Referencia a casilla
 
@@ -149,9 +161,24 @@ class State
         }
 
         //Getter del tablero
-        const array<array<signed char, N>, N>& get_board() const
+        const vector<vector<signed char>>& get_board() const
         {
             return sq;
+        }
+
+        int get_rows() const
+        {
+            return rows;
+        }
+
+        int get_cols() const
+        {
+            return cols;
+        }
+
+        int get_K() const
+        {
+            return K;
         }
   
     private:
@@ -161,7 +188,11 @@ class State
         // stores P1,0,P2 values
         // bounds are checked in debug mode
         // and sq[y][x] = 0 works
-        array<array<signed char, N>, N> sq;
+        vector<vector<signed char>> sq;
+
+        int rows;   //Filas del tablero (M)
+        int cols;   //Columnas del tablero (N)
+        int K;      //Nº de Figuras a alinear (K)
 
         int filled;        //Numero de casillas ocupadas    
 };
@@ -174,64 +205,52 @@ const array<char, 3> State::DISP = {{ 'x', '-', 'o' }};
 int check_winner(const State& state)
 {
     auto board = state.get_board();
+    int rows = state.get_rows();
+    int cols = state.get_cols();
+    int K = state.get_K();
 
-    //Revisar filas
-    for(int y = 0; y < State::N; y++)
+    // Direcciones: horizontal, vertical, diagonal principal, diagonal secundaria
+    int dx[] = {1, 0, 1, 1};
+    int dy[] = {0, 1, 1, -1};
+
+    for(int y = 0; y < rows; y++)
     {
-        int sum = 0;
-
-        for(int x = 0; x < State::N; x++)
+        for(int x = 0; x < cols; x++)
         {
-            sum += board[y][x];
+            int player = board[y][x];
+
+            if(player == 0){ continue; }
+
+            for(int dir = 0; dir < 4; dir++)
+            {
+                int count = 1;
+
+                for(int step = 1; step < K; step++)
+                {
+                    int nx = x + dx[dir] * step;
+                    int ny = y + dy[dir] * step;
+
+                    //Salir si se sale del tablero
+                    if(nx < 0 || nx >= cols ||
+                       ny < 0 || ny >= rows)
+                    {
+                        break;
+                    }
+
+                    if(board[ny][nx] == player) { count++; }
+                    else{ break; }
+
+                    if(count >= K) { return player; }
+
+                }
+            }
         }
 
-        if(sum == -3) { return State::P1; }     //Gana el jugador 1
-
-        if(sum == 3) {return State::P2; }       //Gana el jugador 2
     }
 
-    //Rvisar columnas
-    for(int x = 0; x < State::N; x++)
-    {
-        int sum = 0;
-
-        for(int y = 0; y < State::N; y++)
-        {
-            sum += board[y][x];
-        }
-
-        if(sum == -3) { return State::P1; }
-
-        if(sum == 3) {return State::P2; }
-    }
-
-    //Revisar diagonal principal (\)
-    int diagP = 0;
-
-    for(int i = 0; i < State::N; i++)
-    {
-        diagP += board[i][i];
-    }
-
-    if(diagP == -3) { return State::P1; }
-
-    if(diagP == 3) {return State::P2; }
-
-    //Revisar diagonal secundaria (/)
-    int diagS = 0;
-
-    for(int i = 0; i < State::N; i++)
-    {
-        diagS += board[i][State::N - 1 - i];
-    }
-
-    if(diagS == -3) { return State::P1; }
-
-    if(diagS == 3) {return State::P2; }
-
-    return 0; //Nadie gana la partida
+    return 0;
 }
-      
+
 //Obtener movimientos validos
 vector<Move> get_valid_moves(const State& state)
 {
@@ -239,9 +258,9 @@ vector<Move> get_valid_moves(const State& state)
     auto board = state.get_board();
 
     //Buscar espacios vacios
-    for(int y = 0; y < State::N; y++)
+    for(int y = 0; y < state.get_rows(); y++)
     {
-        for(int x = 0; x < State::N; x++)
+        for(int x = 0; x < state.get_cols(); x++)
         {
             if(board[y][x] == 0)
             {
@@ -338,9 +357,9 @@ Move random_Player(const State& state)
     vector<Move> valid_moves;   //movimientos validos a realizar
 
     //Buscar espacios vacios
-    for(int y = 0; y < State::N; y++)
+    for(int y = 0; y < state.get_rows(); y++)
     {
-        for(int x = 0; x < State::N; x++)
+        for(int x = 0; x < state.get_cols(); x++)
         {
             if(board[y][x] == 0)
             {
@@ -443,8 +462,8 @@ Move human_Player(const State& state)
 
         //Verificar rango
         bool valid_range = 
-            x >= 0 && x < State::N &&
-            y >= 0 && y < State::N;
+            x >= 0 && x < state.get_cols() &&
+            y >= 0 && y < state.get_rows();
 
         if(valid_range)
         {
@@ -465,69 +484,6 @@ Move human_Player(const State& state)
 
 int main()
 {
-    /*
-    std::vector<string> boards
-    {
-        "--- \
-        --- \
-        ---", // x draws with (0,0)
-
-        "--- \
-        -o- \
-        ---", // x draws with (0,0)
-
-        "--- \
-        --o \
-        ---", // x draws with (0,1)
-
-        "-oo \
-        ooo \
-        ooo", // a player already won
-    
-        "xox \
-        oxo \
-        oxo", // draw
-
-        "--o \
-        -oo \
-        ---", // x loses
-
-        "oxo \
-        xx- \
-        oox", // x wins with (2,1)
-
-        "-xo \
-        oox \
-        xoo", // x draws with (0,0)
-
-        "--- \
-        -x- \
-        ---"  // x wins with (0,0)
-    };
-
-    for (const string & s : boards) 
-    {
-        // construct state from string
-        // also catch exception and print
-        // error message
-        try 
-        {
-            State st;
-            st.set(s);
-            cout<<"Before move"<<endl;
-            st.print();
-            cout<<"After move. Status: "<<st.make_move(0,0)<<endl;
-            st.print();
-            cout<<"==============================="<<endl;
-            cout << endl;
-        }
-        catch (InputException & e) 
-        {
-            cerr << "corrupt input: " << s << endl;
-        }
-    }
-    */
-
     srand(time(0));     //Iniciar random
 
     //Sleccionar tipo de jugador
@@ -548,7 +504,7 @@ int main()
     cout << "Jugador 2 (O): ";
     cin >> p2_type;
 
-    State state;     //Crear estado inicial del juego
+    State state(5,5,4);     //Crear estado inicial del juego
 
     int turn = 1;   //Turnos del juego
 
