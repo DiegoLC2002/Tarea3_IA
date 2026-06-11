@@ -251,6 +251,64 @@ int check_winner(const State& state)
     return 0;
 }
 
+//Comprobar heuristica
+int heuristic(const State& state)
+{
+    auto board = state.get_board();
+
+    int rows = state.get_rows();
+    int cols = state.get_cols();
+
+    int bestX = 0;
+    int bestO = 0;
+
+    // Direcciones: horizontal, vertical, diagonal principal, diagonal secundaria
+    int dx[] = {1, 0, 1, 1};
+    int dy[] = {0, 1, 1, -1};
+
+    for(int y = 0; y < rows; y++)
+    {
+        for(int x = 0; x < cols; x++)
+        {
+            int player = board[y][x];
+
+            if(player == 0){ continue; }
+
+            for(int dir = 0; dir < 4; dir++)
+            {
+                int count = 1;
+
+                int nx = x + dx[dir];
+                int ny = y + dy[dir];
+
+                while (nx >= 0 && nx < cols &&
+                       ny >= 0 && ny < rows &&
+                       board[ny][nx] == player)
+                {
+                    count++;
+
+                    nx += dx[dir];
+                    ny += dy[dir];
+                }
+                
+                if(player == State::P1)
+                {
+                    bestX = max(bestX, count);
+                }
+                else
+                {
+                    bestO = max(bestO, count);
+                }
+            }
+        }
+    }
+
+    //Retorna un valor negativo si favorece a X y uno positivo si favorece a O
+    return bestO - bestX;
+}
+
+
+
 //Obtener movimientos validos
 vector<Move> get_valid_moves(const State& state)
 {
@@ -280,41 +338,45 @@ State apply_move(State state, Move move)
 }
 
 ////////////////////////////////// MiniMax ////////////////////////////////////
-int MiniMax(State state)
+int MiniMax(State state, int depth)
 {
     int winner = check_winner(state);
 
-    if(winner == State::P1){ return -1; }    //Gana X
-    if(winner == State::P2){ return 1; }    //Gana O
+    //Comprobar ganador
+    if(winner == State::P1){ return -10000; }    //Gana X
+    if(winner == State::P2){ return 10000; }    //Gana O
     if(state.full()){ return 0; }    //Empate
+
+    //comprobar profundidad
+    if(depth == 0){ return heuristic(state); }
 
     vector<Move> valid_moves = get_valid_moves(state);
 
     //Turno de X (Minimizador)
     if(state.get_to_move() == State::P1)
     {
-        int best = 1000;
+        int best = 100000;
 
         for(auto move : valid_moves)
         {
             State next = apply_move(state, move);
-            int score = MiniMax(next);
+            int score = MiniMax(next, depth - 1);
 
-            if(score < best) { best = score; }
+            best = min(best, score);
         }
 
         return best;
     }
     else    //Turno de O (maximizador)
     {
-        int best = -1000;
+        int best = -100000;
 
         for(auto move : valid_moves)
         {
             State next = apply_move(state, move);
-            int score = MiniMax(next);
+            int score = MiniMax(next, depth - 1);
 
-            if(score > best) { best = score; }
+            best = max(best, score);
         }
 
         return best;
@@ -323,25 +385,28 @@ int MiniMax(State state)
 }
 
 ////////////////////////////////// NegaMax ////////////////////////////////////
-int NegaMax(State state, int color)
+int NegaMax(State state, int depth, int color)
 {
     int winner = check_winner(state);
 
     //Estados terminales
-    if(winner == State::P1){ return color * (-1); }    //Si le toca jugar a O, entocnes gana X acaba de ganar
-    if(winner == State::P2){ return color * (1); }    //Si le toca jugar a X, entocnes gana O acaba de ganar
+    if(winner == State::P1){ return color * (-10000); }    //Si le toca jugar a O, entocnes gana X acaba de ganar
+    if(winner == State::P2){ return color * (10000); }    //Si le toca jugar a X, entocnes gana O acaba de ganar
     if(state.full()){ return 0; }    //Empate
 
-    int best = -1000;
+    //comprobar profundidad
+    if(depth == 0){ return color * heuristic(state); }
+
+    int best = -100000;
 
     vector<Move> valid_moves = get_valid_moves(state);
 
     for(auto move : valid_moves)
     {
         State next = apply_move(state, move);
-        int score = -NegaMax(next, -color);
+        int score = -NegaMax(next, depth - 1, -color);
 
-        if(score > best) { best = score; }
+        best = max(best, score);
     }
 
     return best;
@@ -376,7 +441,7 @@ Move random_Player(const State& state)
 
 
 //Jugador MiniMax
-Move minimax_Player(const State& state)
+Move minimax_Player(const State& state, int depth)
 {
     vector<Move> valid_moves = get_valid_moves(state);
     Move bestMove = valid_moves[0];
@@ -384,12 +449,12 @@ Move minimax_Player(const State& state)
     //X minimiza
     if(state.get_to_move() == State::P1)
     {
-        int bestScore = 1000;
+        int bestScore = 100000;
 
         for(auto move : valid_moves)
         {
             State next = apply_move(state, move);
-            int score = MiniMax(next);
+            int score = MiniMax(next, depth - 1);
 
             if(score < bestScore) 
             { 
@@ -401,12 +466,12 @@ Move minimax_Player(const State& state)
     }
     else    //O maximiza
     {
-        int bestScore = -1000;
+        int bestScore = -100000;
 
         for(auto move : valid_moves)
         {
             State next = apply_move(state, move);
-            int score = MiniMax(next);
+            int score = MiniMax(next, depth - 1);
 
             if(score > bestScore) 
             { 
@@ -422,12 +487,12 @@ Move minimax_Player(const State& state)
 
 
 //Jugador Negamax
-Move negamax_Player(const State& state)
+Move negamax_Player(const State& state, int depth)
 {
     vector<Move> valid_moves = get_valid_moves(state);
     Move bestMove = valid_moves[0];
 
-    int bestScore = -1000;
+    int bestScore = -100000;
     int color;
 
     if(state.get_to_move() == State::P1) { color = -1; }
@@ -436,7 +501,7 @@ Move negamax_Player(const State& state)
     for(auto move : valid_moves)
     {
         State next = apply_move(state, move);
-        int score = -NegaMax(next, -color);
+        int score = -NegaMax(next, depth - 1, -color);
 
             if(score > bestScore) 
             { 
