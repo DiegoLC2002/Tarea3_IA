@@ -15,10 +15,21 @@
 using namespace std;
 
 //////////////// Metricas ///////////////////
+// Por turno
 long long nodesVisited = 0;     //Total de nodos visitados
 long long nodesPruned = 0;      //Número de podas realizadas (solo AlphaBeta)
 double decisionTime = 0.0;      //Tiempo que tarda un agente en decidir su movimiento (segundos)
 int depthReached = 0;   //Profundidad máxima utilizada en la búsqueda
+
+//Por partida
+long long totalNodesX = 0;
+long long totalNodesO = 0;
+
+long long totalPrunedX = 0;
+long long totalPrunedO = 0;
+
+double totalTimeX = 0.0;
+double totalTimeO = 0.0;
 
 // thrown when set() encounters an illegal input
 struct InputException { };
@@ -715,7 +726,7 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    // K no puede ser mayor que ambas dimensiones
+    // K debe caber en una de las dimensiones del tablero
     if(K > max(M, N))
     {
         cout << "Error: K es demasiado grande para el tablero." << endl;
@@ -748,7 +759,16 @@ int main(int argc, char* argv[])
     State state(M,N,K);
     int turn = 1;   //Turnos del juego
 
-    
+    // Reiniciar estadísticas de la partida
+    totalNodesX = 0;
+    totalNodesO = 0;
+
+    totalPrunedX = 0;
+    totalPrunedO = 0;
+
+    totalTimeX = 0.0;
+    totalTimeO = 0.0;
+
     while (true)
     {
         //Separador visual
@@ -762,39 +782,93 @@ int main(int argc, char* argv[])
         //Gana jugador 1
         if(winner == State::P1)
         {
-            cout << endl;
             cout << "¡¡¡ Gana X !!!!" << endl;
+
+            cout << "\n========== RESUMEN DE LA PARTIDA ==========\n";
+
+            cout << "Resultado: Gana X" << endl;
+            cout << "Turnos jugados: " << turn - 1 << endl;
+
+            cout << "\nJugador X:" << endl;
+            cout << "Tiempo total: " << totalTimeX << " s" << endl;
+            cout << "Nodos visitados: " << totalNodesX << endl;
+            cout << "Nodos podados: " << totalPrunedX << endl;
+
+            cout << "\nJugador O:" << endl;
+            cout << "Tiempo total: " << totalTimeO << " s" << endl;
+            cout << "Nodos visitados: " << totalNodesO << endl;
+            cout << "Nodos podados: " << totalPrunedO << endl;
+
+            cout << "===========================================" << endl;
+
             break;
         }
 
         //Gana jugador 2
         if(winner == State::P2)
         {
-            cout << endl;
             cout << "¡¡¡ Gana O !!!!" << endl;
+
+            cout << "\n========== RESUMEN DE LA PARTIDA ==========\n";
+
+            cout << "Resultado: Gana O" << endl;
+            cout << "Turnos jugados: " << turn - 1 << endl;
+
+            cout << "\nJugador X:" << endl;
+            cout << "Tiempo total: " << totalTimeX << " s" << endl;
+            cout << "Nodos visitados: " << totalNodesX << endl;
+            cout << "Nodos podados: " << totalPrunedX << endl;
+
+            cout << "\nJugador O:" << endl;
+            cout << "Tiempo total: " << totalTimeO << " s" << endl;
+            cout << "Nodos visitados: " << totalNodesO << endl;
+            cout << "Nodos podados: " << totalPrunedO << endl;
+
+            cout << "===========================================" << endl;
+
             break;
         }
 
         //Empate
         if(state.full())
         {
-            cout << endl;
             cout << "Se ha Empatado" << endl;
+
+            cout << "\n========== RESUMEN DE LA PARTIDA ==========\n";
+
+            cout << "Resultado: Empate" << endl;
+            cout << "Turnos jugados: " << turn - 1 << endl;
+
+            cout << "\nJugador X:" << endl;
+            cout << "Tiempo total: " << totalTimeX << " s" << endl;
+            cout << "Nodos visitados: " << totalNodesX << endl;
+            cout << "Nodos podados: " << totalPrunedX << endl;
+
+            cout << "\nJugador O:" << endl;
+            cout << "Tiempo total: " << totalTimeO << " s" << endl;
+            cout << "Nodos visitados: " << totalNodesO << endl;
+            cout << "Nodos podados: " << totalPrunedO << endl;
+
+            cout << "===========================================" << endl;
+
             break;
         }
 
         //Obtener movimiento realizado
         Move move;
         int currentAgent;
+        int currentPlayer;
 
         //Turno jugador X
         if(state.get_to_move() == State::P1)
         {
             currentAgent = p1_type;
+            currentPlayer = State::P1;
         }
         else    //Turno jugador O
         {
             currentAgent = p2_type;
+            currentPlayer = State::P2;
         }
 
         // Reiniciar métricas para la jugada
@@ -830,6 +904,20 @@ int main(int argc, char* argv[])
         auto end = chrono::high_resolution_clock::now();
 
         decisionTime = chrono::duration<double>(end - start).count();
+
+        //Calcular metricas de la partida
+        if(currentPlayer == State::P1)
+        {
+            totalNodesX += nodesVisited;
+            totalPrunedX += nodesPruned;
+            totalTimeX += decisionTime;
+        }
+        else
+        {
+            totalNodesO += nodesVisited;
+            totalPrunedO += nodesPruned;
+            totalTimeO += decisionTime;
+        }
 
         //Mostrar metricas
         cout << "\n--- Metricas de la jugada ---" << endl;
